@@ -97,5 +97,6 @@ class GLMArchitecture(BaseArchitecture):
         """
 
         # perform forward prediction step
-        out = self.inv_link(self.lin.forward(X).T)
+        eta = self.lin.forward(X).T
+        out = self.inv_link(eta)
         return out

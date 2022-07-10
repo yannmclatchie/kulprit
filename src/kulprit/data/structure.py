@@ -5,6 +5,8 @@ import torch
 from bambi.models import Model
 from pymc.util import is_transformed_name, get_untransformed_name
 
+from kulprit.families.link import Link
+
 
 class ModelStructure:
     def __init__(self, model: Model) -> None:
@@ -63,7 +65,7 @@ class ModelStructure:
         self.architecture = "glm" if len(model.group_specific_terms) == 0 else "glmm"
 
         # define the link function and family of the reference model
-        self.link = model.family.link
+        self.link = Link(model.family.link.name)
         self.family = model.family.name
 
         # extract covariate and variate names

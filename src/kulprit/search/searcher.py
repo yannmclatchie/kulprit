@@ -17,9 +17,6 @@ class Searcher:
 
         Args:
             projector (Projector): Projector object.
-
-        Raises:
-            UserWarning: If method is not "forward" or "l1".
         """
 
         # initialise projector for the search procedure
@@ -54,6 +51,9 @@ class Searcher:
         Returns:
             dict: A dictionary of submodels, keyed by the number of terms in the
                 submodel.
+
+        Raises:
+            UserWarning: If method is not "forward" or "l1".
         """
 
         # test valid solution method

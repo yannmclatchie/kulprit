@@ -14,6 +14,7 @@ import torch
 
 from kulprit.data.data import ModelData
 from kulprit.data.structure import ModelStructure
+from kulprit.families.family import Family
 
 
 class SubModel(ABC):
@@ -116,6 +117,7 @@ class SubModelInferenceData(SubModel):
 
         # log reference model ModelData
         self.data = data
+        self.family = Family(self.data)
 
     def create(
         self,
@@ -157,14 +159,16 @@ class SubModelInferenceData(SubModel):
             # reshape `disp_perp` if present
             disp_perp = torch.reshape(disp_perp, (num_chain, num_draw))
             # update the posterior draws dictionary with dispersion parameter
-            response_name = f"{self.data.structure.response_name}_sigma"
-            disp_dict = {response_name: disp_perp}
+            disp_name = (
+                self.data.structure.disp_name + self.family.family.disp_name_format
+            )
+            disp_dict = {disp_name: disp_perp}
             posterior.update(disp_dict)
             # check for transformed variables
-            transform_name, transform_function = transforms[response_name]
+            transform_name, transform_function = transforms[disp_name]
             if transform_name:
                 disp_dict = {
-                    f"{response_name}_{transform_name}__": transform_function(
+                    f"{disp_name}_{transform_name}__": transform_function(
                         disp_perp.numpy()
                     ).eval(),
                 }
