@@ -4,7 +4,20 @@ import torch
 
 from kulprit.data.data import ModelData
 from kulprit.families import BaseFamily
-from kulprit.families.continuous import GaussianFamily
+from kulprit.families.continuous import (
+    BetaFamily,
+    GammaFamily,
+    GaussianFamily,
+    PoissonFamily,
+    StudentTFamily,
+    WaldFamily,
+)
+from kulprit.families.discrete import (
+    BernoulliFamily,
+    BinomialFamily,
+    CategoricalFamily,
+    NegativeBinomialFamily,
+)
 
 
 class Family:
@@ -21,11 +34,20 @@ class Family:
 
         # define all available family classes
         self.family_dict = {
+            "bernoulli": BernoulliFamily,
+            "beta": BetaFamily,
+            "binomial": BinomialFamily,
+            "categorical": CategoricalFamily,
+            "gamma": GammaFamily,
             "gaussian": GaussianFamily,
+            "negativebinomial": NegativeBinomialFamily,
+            "poisson": PoissonFamily,
+            "t": StudentTFamily,
+            "wald": WaldFamily,
         }
 
         # test family name
-        if self.family_name not in self.family_dict:
+        if self.family_name not in self.family_dict.keys():
             raise NotImplementedError(
                 f"The {self.family_name} family has not yet been implemented."
             )
