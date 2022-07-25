@@ -2,8 +2,10 @@
 
 from typing import Optional, List, Union
 
-from kulprit.data.data import ModelData
-from kulprit.data.submodel import SubModelStructure, SubModelInferenceData
+from arviz import InferenceData
+from bambi import Model
+
+from kulprit.data.submodel import SubModel, init_idata
 from kulprit.families.family import Family
 from kulprit.projection.solver import Solver
 
@@ -11,10 +13,12 @@ from kulprit.projection.solver import Solver
 class Projector:
     def __init__(
         self,
-        data: ModelData,
+        model: Model,
+        idata: InferenceData,
         path: Optional[dict] = None,
         num_iters: Optional[int] = 400,
         learning_rate: Optional[float] = 0.01,
+        num_thinned_samples: Optional[int] = 400,
     ) -> None:
         """Reference model builder for projection predictive model selection.
 
@@ -33,23 +37,31 @@ class Projector:
             learning_rate (float): The backprop optimiser's learning rate
         """
 
-        # log reference model data object
-        self.data = data
-
-        # build model family
-        self.family = Family(self.data)
+        # log reference model and reference inference data object
+        self.idata = idata
+        self.model = model
+        self.family = Family(model)
 
         # set optimiser parameters
         self.num_iters = num_iters
         self.learning_rate = learning_rate
+        self.num_thinned_samples = num_thinned_samples
 
-        # initialise search path
+        # build solver
+        self.solver = Solver(
+            ref_model=self.model,
+            ref_idata=self.idata,
+            num_iters=self.num_iters,
+            learning_rate=self.learning_rate,
+        )
+
+        # log search path
         self.path = path
 
     def project(
         self,
         terms: Union[List[str], int],
-    ) -> ModelData:
+    ) -> SubModel:
         """Wrapper function for projection method.
 
         Args:
@@ -65,7 +77,7 @@ class Projector:
         # project terms by name
         if isinstance(terms, list):
             # test `terms` input
-            if not all([term in self.data.structure.term_names for term in terms]):
+            if not all([term in self.model.term_names for term in terms]):
                 raise UserWarning(
                     "Please ensure that all terms selected for projection exist in"
                     + " the reference model."
@@ -87,8 +99,8 @@ class Projector:
 
     def project_names(
         self,
-        term_names: List[List[str]],
-    ) -> ModelData:
+        term_names: List[str],
+    ) -> SubModel:
         """Primary projection method for GLM reference model.
 
         The projection is defined as the values of the submodel parameters
@@ -98,41 +110,24 @@ class Projector:
 
         Args:
             term_names (List[str]): The names of parameters to project onto the
-                submodel, **not** including the intercept term
+                submodel
 
         Returns:
             kulprit.data.ModelData: Projected submodel ``ModelData`` object
         """
 
-        # build restricted model object
-        structure_factory = SubModelStructure(self.data)
-        submodel_structure = structure_factory.create(term_names)
-
-        # build solver
-        self.solver = Solver(
-            data=self.data,
-            family=self.family,
-            num_iters=self.num_iters,
-            learning_rate=self.learning_rate,
+        # initialise restricted model inference data
+        res_idata = init_idata(
+            ref_model=self.model,
+            ref_idata=self.idata,
+            term_names=term_names,
+            num_thinned_samples=self.num_thinned_samples,
         )
 
-        # solve the parameter projections depending on method
-        theta_perp, final_loss = self.solver.solve(submodel_structure)
+        # solve the parameter projections
+        sub_model = self.solver.solve(res_idata=res_idata, term_names=term_names)
 
-        # extract restricted design matrix
-        X_perp = submodel_structure.X
-
-        # project dispersion parameters in the model, if present
-        disp_perp = self.solver.solve_dispersion(theta_perp, X_perp)
-
-        # build the complete restricted model posterior
-        idata_factory = SubModelInferenceData(self.data)
-        sub_model_idata = idata_factory.create(submodel_structure, theta_perp, disp_perp)
-
-        # finally, combine these projected structure and idata into `ModelData`
-        sub_model = ModelData(
-            structure=submodel_structure,
-            idata=sub_model_idata,
-            dist_to_ref_model=final_loss,
-        )
+        # compute the submodel's log-likelihood
+        if "log_likelihood" not in sub_model.idata.groups():
+            sub_model.add_log_likelihood()
         return sub_model
